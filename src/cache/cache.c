@@ -378,7 +378,34 @@ unsigned char get_byte(file_cache * fc,int offset, int * success)
 			}
 			else
 			{
+				if( fc->dirty )
+				{
+					if( fc->ramfile >= 0 )
+					{
+						if( fseek_ramfile( fc->ramfile, fc->current_offset, SEEK_SET ) )
+							goto error;
+
+						if( fwrite_ramfile( &fc->cache_buffer, fc->cur_page_size, 1, fc->ramfile ) != 1 )
+							goto error;
+					}
+					else
+					{
+						if( fseek(fc->f, fc->current_offset, SEEK_SET) )
+							goto error;
+
+						if( fwrite( &fc->cache_buffer, fc->cur_page_size, 1, fc->f ) != 1 )
+							goto error;
+					}
+
+					fc->dirty = 0;
+				}
+
 				fc->current_offset = (offset & ~(FILE_CACHE_SIZE-1));
+
+				if(fc->current_offset + FILE_CACHE_SIZE > fc->file_size)
+					fc->cur_page_size = ( fc->file_size - fc->current_offset );
+				else
+					fc->cur_page_size = FILE_CACHE_SIZE;
 
 				if( fc->ramfile >= 0 )
 					fseek_ramfile(fc->ramfile, fc->current_offset,SEEK_SET);
@@ -413,6 +440,10 @@ unsigned char get_byte(file_cache * fc,int offset, int * success)
 	}
 
 	return byte;
+
+error:
+
+	return 0;
 }
 
 int set_byte(file_cache * fc,unsigned int offset, unsigned char byte)
@@ -452,6 +483,7 @@ int set_byte(file_cache * fc,unsigned int offset, unsigned char byte)
 				}
 
 				fc->current_offset = (offset & ~(FILE_CACHE_SIZE-1));
+
 				if(fc->current_offset + FILE_CACHE_SIZE > fc->file_size)
 					fc->cur_page_size = ( fc->file_size - fc->current_offset );
 				else
@@ -464,8 +496,7 @@ int set_byte(file_cache * fc,unsigned int offset, unsigned char byte)
 
 					memset(&fc->cache_buffer,fc->fill_val,FILE_CACHE_SIZE);
 
-					if( fread_ramfile(&fc->cache_buffer,fc->cur_page_size,1,fc->ramfile) != 1 )
-						goto error;
+					fread_ramfile(&fc->cache_buffer,fc->cur_page_size,1,fc->ramfile);
 				}
 				else
 				{
@@ -475,7 +506,9 @@ int set_byte(file_cache * fc,unsigned int offset, unsigned char byte)
 					memset(&fc->cache_buffer,fc->fill_val,FILE_CACHE_SIZE);
 
 					if( fread(&fc->cache_buffer,fc->cur_page_size,1,fc->f) != 1 )
-						goto error;
+					{
+						// End of file ?
+					}
 				}
 
 				fc->cache_buffer[ offset - fc->current_offset ] = byte;
