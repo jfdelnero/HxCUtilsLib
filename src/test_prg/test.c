@@ -24,6 +24,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "gfx.h"
 #include "bmp_file.h"
@@ -74,7 +75,7 @@ int main (int argc, char ** argv)
 
 	rand_gen_init(&rand_state,0x6728308);
 
-	wav = create_wav("test.wav",44100,WAV_FILE_FORMAT_WAV_16BITS_MONO);
+	wav = create_wav("test_noise.wav",44100,WAV_FILE_FORMAT_WAV_16BITS_MONO);
 	if(wav)
 	{
 		int16_t smp;
@@ -82,6 +83,34 @@ int main (int argc, char ** argv)
 		for(int i=0;i<44100*10;i++)
 		{
 			smp = rand_gen_get_next_word(&rand_state);
+			write_wav(wav, &smp, 1);
+		}
+
+		close_wav(wav);
+	}
+
+	#if defined(M_PI)
+	#define PI M_PI
+	#else
+	#define PI ((double)(3.1415926535897932384626433832795))
+	#endif
+
+	wav = create_wav("test_sinus.wav",44100,WAV_FILE_FORMAT_WAV_16BITS_MONO);
+	if(wav)
+	{
+		int16_t smp;
+		double phase;
+
+		phase = 0;
+
+		for(int i=0;i<44100*10;i++)
+		{
+			smp = (int)(cos(phase)*30000);
+
+			phase += ( (2.0 * PI * 1000) / (double)44100 );
+			if(phase >= (2.0 * PI) )
+				phase -= (2.0 * PI);
+
 			write_wav(wav, &smp, 1);
 		}
 
